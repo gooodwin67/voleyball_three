@@ -83,6 +83,8 @@ let oldElapsedTime;
 const floorShape = new CANNON.Plane();
 const floorBody = new CANNON.Body();
 
+let playerBody;
+
 
 
 
@@ -105,7 +107,7 @@ function init() {
   var materialPlayer = new THREE.MeshPhongMaterial({ color: 0x0000ff, side: THREE.DoubleSide })
   player = new THREE.Mesh(geometryPlayer, materialPlayer);
   player.position.set(0, 10, 50);
-  //scene.add(player);
+  scene.add(player);
 
   var geometryPlayer2 = new THREE.BoxGeometry(10, 20, 10);
   var materialPlayer2 = new THREE.MeshPhongMaterial({ color: 0x0000ff, side: THREE.DoubleSide })
@@ -120,12 +122,25 @@ function init() {
   scene.add(ball);
 
 
-  world.gravity.set(0, -9.82, 0);
+  world.gravity.set(0, -89.82, 0);
+
+  const defaultMaterial = new CANNON.Material("default");
+
+  const defaultContactMaterial = new CANNON.ContactMaterial(
+    defaultMaterial,
+    defaultMaterial,
+    {
+      restitution: 0.4,
+    }
+  );
+  world.addContactMaterial(defaultContactMaterial);
+  world.defaultContactMaterial = defaultContactMaterial;
 
   body = new CANNON.Body({
     mass: 1,
     position: new CANNON.Vec3(ball.position.x, ball.position.y, ball.position.z),
     shape: shape,
+    material: defaultMaterial,
   });
 
   world.addBody(body);
@@ -136,6 +151,15 @@ function init() {
   floorBody.addShape(floorShape);
   floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(-1, 0, 0), Math.PI * 0.5);
   world.addBody(floorBody);
+
+
+  playerBody = new CANNON.Body({
+    mass: 1,
+    position: new CANNON.Vec3(player.position.x, player.position.y, player.position.z),
+    shape: shape,
+    material: defaultMaterial,
+  });
+  world.addBody(playerBody);
 
 
 
@@ -164,6 +188,7 @@ function animate() {
   world.step(1 / 60, deltaTime, 3);
 
   ball.position.copy(body.position);
+  playerBody.position.copy(player.position);
 
 };
 
