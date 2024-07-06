@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Voleyball</title>
+	<style>
+		body {
+			margin: 0;
+			/*cursor: none;*/
+		}
+	</style>
+	<link rel="stylesheet" href="style.css">
+
+
+
+</head>
+
+<body>
+
+	<div class="game">
+		<div class="stats"></div>
+		<div class="top_block">
+			<div class="player_health">
+				<div class="player_health_in"></div>
+				<div class="player_health_in_text"></div>
+			</div>
+			<div class="enemy_health">
+				<div class="enemy_health_in"></div>
+				<div class="enemy_health_in_text"></div>
+			</div>
+		</div>
+
+	</div>
+
+
+	<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.148.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.148.0/examples/jsm/"
+    }
+  }
+</script>
+	<script src="libs/jquery.min.js"></script>
+
+
+
+
+	<script type="text/javascript" src='libs/THREEx.KeyboardState.js'></script>
+	<script type="module" src="main.js"></script>
+
+
+</body>
+
+</html>
