@@ -4,8 +4,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { detectCollisionCubes } from './detectColisions.js';
 
-import * as CANNON from './libs/cannon-es.js';
-
 import { OrbitControls } from "three/addons/controls/OrbitControls";
 
 
@@ -55,7 +53,7 @@ controls.target.set(0, 5, 0);
 
 var keyboard = new THREEx.KeyboardState();
 
-
+let clock = new THREE.Clock();
 
 let player;
 let playerSpeed = 1;
@@ -68,34 +66,135 @@ let ball;
 
 
 
+let physicsWorld;
+let rigidBodies = [];
+let tmpTrans;
 
-const world = new CANNON.World();
-const shape = new CANNON.Sphere(0.5);
-let body = new CANNON.Body({
-  mass: 1,
-  position: new CANNON.Vec3(0, 3, 0),
-  shape: shape,
-});
+function setupPhysicsWorld() {
 
-const clock = new THREE.Clock();
-let oldElapsedTime;
+  let collisionConfiguration = new Ammo.btDefaultCollisionConfiguration(),
+    dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration),
+    overlappingPairCache = new Ammo.btDbvtBroadphase(),
+    solver = new Ammo.btSequentialImpulseConstraintSolver();
 
-const floorShape = new CANNON.Plane();
-const floorBody = new CANNON.Body();
+  physicsWorld = new Ammo.btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
+  physicsWorld.setGravity(new Ammo.btVector3(0, -10, 0));
 
-let playerBody;
+}
 
+
+
+
+function createBlock() {
+
+  let pos = { x: 0, y: 0, z: 0 };
+  let scale = { x: 200, y: 2, z: 300 };
+  let quat = { x: 0, y: 0, z: 0, w: 1 };
+  let mass = 0;
+
+  //threeJS Section
+  let blockPlane = new THREE.Mesh(new THREE.BoxBufferGeometry(), new THREE.MeshPhongMaterial({ color: 0xa0afa4 }));
+
+  blockPlane.position.set(pos.x, pos.y, pos.z);
+  blockPlane.scale.set(scale.x, scale.y, scale.z);
+
+  blockPlane.castShadow = true;
+  blockPlane.receiveShadow = true;
+
+  scene.add(blockPlane);
+
+
+  //Ammojs Section
+  let transform = new Ammo.btTransform();
+  transform.setIdentity();
+  transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+  transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
+  let motionState = new Ammo.btDefaultMotionState(transform);
+
+  let colShape = new Ammo.btBoxShape(new Ammo.btVector3(scale.x * 0.5, scale.y * 0.5, scale.z * 0.5));
+  colShape.setMargin(0.05);
+
+  let localInertia = new Ammo.btVector3(0, 0, 0);
+  colShape.calculateLocalInertia(mass, localInertia);
+
+  let rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, colShape, localInertia);
+  let body = new Ammo.btRigidBody(rbInfo);
+
+
+  physicsWorld.addRigidBody(body);
+}
+
+
+function createBall() {
+
+  let pos = { x: 0, y: 40, z: 100 };
+  let radius = 4;
+  let quat = { x: 0, y: 0, z: 0, w: 1 };
+  let mass = 1;
+
+  //threeJS Section
+  let ball = new THREE.Mesh(new THREE.SphereBufferGeometry(radius), new THREE.MeshPhongMaterial({ color: 0xff0505 }));
+
+  ball.position.set(pos.x, pos.y, pos.z);
+
+  ball.castShadow = true;
+  ball.receiveShadow = true;
+
+  scene.add(ball);
+
+
+  //Ammojs Section
+  let transform = new Ammo.btTransform();
+  transform.setIdentity();
+  transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+  transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
+  let motionState = new Ammo.btDefaultMotionState(transform);
+
+  let colShape = new Ammo.btSphereShape(radius);
+  colShape.setMargin(0.05);
+
+  let localInertia = new Ammo.btVector3(0, 0, 0);
+  colShape.calculateLocalInertia(mass, localInertia);
+
+  let rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, colShape, localInertia);
+  let body = new Ammo.btRigidBody(rbInfo);
+
+
+  physicsWorld.addRigidBody(body);
+
+  ball.userData.physicsBody = body;
+  rigidBodies.push(ball);
+}
+
+function updatePhysics(deltaTime) {
+
+  // Step world
+  physicsWorld.stepSimulation(deltaTime, 10);
+
+  // Update rigid bodies
+  for (let i = 0; i < rigidBodies.length; i++) {
+    let objThree = rigidBodies[i];
+    let objAmmo = objThree.userData.physicsBody;
+    let ms = objAmmo.getMotionState();
+    if (ms) {
+
+      ms.getWorldTransform(tmpTrans);
+      let p = tmpTrans.getOrigin();
+      let q = tmpTrans.getRotation();
+      objThree.position.set(p.x(), p.y(), p.z());
+      objThree.quaternion.set(q.x(), q.y(), q.z(), q.w());
+
+    }
+  }
+
+}
 
 
 
 function init() {
 
-
-  var geometryPlane = new THREE.BoxGeometry(200, 1, 400);
-  var materialPlane = new THREE.MeshPhongMaterial({ color: 0xcccccc, side: THREE.DoubleSide })
-  let plane = new THREE.Mesh(geometryPlane, materialPlane);
-  plane.position.set(0, -0.5, 0);
-  scene.add(plane);
+  createBlock();
+  createBall();
 
   var geometryNet = new THREE.BoxGeometry(200, 30, 2);
   var materialNet = new THREE.MeshPhongMaterial({ color: 0x0cccccc, side: THREE.DoubleSide, transparent: true, opacity: 0.5 })
@@ -115,57 +214,43 @@ function init() {
   player2.position.set(0, 10, -70);
   scene.add(player2);
 
-  var geometryBall = new THREE.SphereGeometry(4, 20, 20);
-  var materialBall = new THREE.MeshPhongMaterial({ color: 0xff0000, side: THREE.DoubleSide })
-  ball = new THREE.Mesh(geometryBall, materialBall);
-  ball.position.set(0, 70, 50);
-  scene.add(ball);
 
-
-  world.gravity.set(0, -89.82, 0);
-
-  const defaultMaterial = new CANNON.Material("default");
-
-  const defaultContactMaterial = new CANNON.ContactMaterial(
-    defaultMaterial,
-    defaultMaterial,
-    {
-      restitution: 0.4,
-    }
-  );
-  world.addContactMaterial(defaultContactMaterial);
-  world.defaultContactMaterial = defaultContactMaterial;
-
-  body = new CANNON.Body({
-    mass: 1,
-    position: new CANNON.Vec3(ball.position.x, ball.position.y, ball.position.z),
-    shape: shape,
-    material: defaultMaterial,
-  });
-
-  world.addBody(body);
-
-  oldElapsedTime = 0;
-
-  floorBody.mass = 0;
-  floorBody.addShape(floorShape);
-  floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(-1, 0, 0), Math.PI * 0.5);
-  world.addBody(floorBody);
-
-
-  playerBody = new CANNON.Body({
-    mass: 1,
-    position: new CANNON.Vec3(player.position.x, player.position.y, player.position.z),
-    shape: shape,
-    material: defaultMaterial,
-  });
-  world.addBody(playerBody);
 
 
 
 
 };
-init();
+
+
+
+
+Ammo().then(AmmoStart);
+
+function AmmoStart() {
+  tmpTrans = new Ammo.btTransform();
+
+  setupPhysicsWorld();
+
+  init();
+
+  function animate() {
+    controls.update();
+    movePlayer();
+
+    let deltaTime = clock.getDelta();
+
+    updatePhysics(deltaTime);
+  };
+
+  renderer.setAnimationLoop((_) => {
+
+    animate();
+    stats.update();
+    renderer.render(scene, camera);
+  });
+}
+
+
 
 function movePlayer() {
   if (keyboard.pressed("left")) player.position.x -= playerSpeed;
@@ -176,32 +261,7 @@ function movePlayer() {
 
 /*///////////////////////////////////////////////////////////////////*/
 
-function animate() {
-  controls.update();
 
-  movePlayer();
-
-  const elapsedTime = clock.getElapsedTime()
-  const deltaTime = elapsedTime - oldElapsedTime;
-  oldElapsedTime = elapsedTime;
-
-  world.step(1 / 60, deltaTime, 3);
-
-  ball.position.copy(body.position);
-  playerBody.position.copy(player.position);
-
-};
-
-/*///////////////////////////////////////////////////////////////////*/
-
-
-
-renderer.setAnimationLoop((_) => {
-
-  animate();
-  stats.update();
-  renderer.render(scene, camera);
-});
 
 
 /*///////////////////////////////////////////////////////////////////*/
